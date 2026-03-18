@@ -178,7 +178,7 @@ st.title("網格地圖 RL 導航器 (Gridworld)")
 # 側邊欄設定
 with st.sidebar:
     st.header("環境設定")
-    new_n = st.slider("選擇網格維度 (n)", 5, 9, st.session_state.n)
+    new_n = st.slider("選擇網格維度 (n)", 5, 10, st.session_state.n)
     if new_n != st.session_state.n:
         st.session_state.n = new_n
         reset_env()
