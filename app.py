@@ -27,6 +27,9 @@ def init_state():
         st.session_state.V = None
     if 'action_grid' not in st.session_state:
         st.session_state.action_grid = None
+    # 新增：用於記錄最佳路徑的座標
+    if 'optimal_path' not in st.session_state:
+        st.session_state.optimal_path = []
 
 def reset_env():
     """重置地圖與演算法狀態"""
@@ -37,6 +40,7 @@ def reset_env():
     st.session_state.policy = None
     st.session_state.V = None
     st.session_state.action_grid = None
+    st.session_state.optimal_path = []
 
 def handle_click(r, c):
     """處理網格點擊邏輯"""
@@ -105,6 +109,7 @@ def policy_evaluation(n):
     st.session_state.V = V
     st.session_state.action_grid = action_grid
     st.session_state.policy = 'random'
+    st.session_state.optimal_path = [] # 隨機策略不顯示綠色路徑
 
 def value_iteration(n):
     """HW1-3: 價值迭代算法"""
@@ -138,6 +143,32 @@ def value_iteration(n):
     st.session_state.V = V
     st.session_state.action_grid = action_grid
     st.session_state.policy = 'optimal'
+    
+    # --- 新增：追蹤並記錄最佳路徑 ---
+    path = []
+    if st.session_state.start and st.session_state.end:
+        curr = st.session_state.start
+        visited = set() # 防止進入死循環
+        while curr != st.session_state.end:
+            path.append(curr)
+            visited.add(curr)
+            r, c = curr
+            best_a = action_grid[r, c]
+            move = ACTIONS[best_a][0]
+            next_s = (curr[0] + move[0], curr[1] + move[1])
+            
+            # 如果撞牆或遇到已走過的路（避免無限迴圈），則中斷
+            if (next_s[0] < 0 or next_s[0] >= n or 
+                next_s[1] < 0 or next_s[1] >= n or 
+                next_s in st.session_state.obstacles or
+                next_s in visited):
+                break
+            curr = next_s
+            
+        if curr == st.session_state.end:
+            path.append(curr)
+            
+    st.session_state.optimal_path = path
 
 # --- UI 介面 ---
 init_state()
@@ -179,28 +210,51 @@ for r in range(st.session_state.n):
     for c in range(st.session_state.n):
         pos = (r, c)
         
-        # 決定按鈕顯示的文字與狀態
-        cell_text = "⬜"
-        is_disabled = False
-        
-        if pos == st.session_state.start:
-            cell_text = "🟢"
-        elif pos == st.session_state.end:
-            cell_text = "🔴"
-        elif pos in st.session_state.obstacles:
-            cell_text = "⬛"
-        else:
-            # 如果有執行演算法，顯示策略方向與 Value
-            if st.session_state.policy and st.session_state.V is not None:
-                action_sym = ACTIONS[st.session_state.action_grid[r, c]][1]
-                val = st.session_state.V[r, c]
-                cell_text = f"{action_sym}\n{val:.1f}"
-                is_disabled = True # 演算法執行後鎖定網格
+        # --- 如果已經執行過演算法 (顯示模式：使用 HTML/CSS 以支援背景顏色) ---
+        if st.session_state.policy and st.session_state.V is not None:
+            val = st.session_state.V[r, c]
+            action_sym = ACTIONS[st.session_state.action_grid[r, c]][1]
+            
+            # 預設樣式：白底黑字
+            bg_color = "#ffffff" 
+            text_color = "#000000"
+            cell_text = f"{action_sym}<br>{val:.1f}"
+            
+            if pos in st.session_state.obstacles:
+                bg_color = "#333333" # 障礙物為深灰色
+                text_color = "#ffffff"
+                cell_text = "WALL"
+            elif pos == st.session_state.start:
+                cell_text = f"START<br>{action_sym}<br>{val:.1f}"
+            elif pos == st.session_state.end:
+                cell_text = f"END<br>🏁<br>{val:.1f}"
                 
-        # 建立按鈕
-        if cols[c].button(cell_text, key=f"btn_{r}_{c}", disabled=is_disabled, use_container_width=True):
-            handle_click(r, c)
-            st.rerun()
+            # 重點：如果正在顯示最佳策略，且該格子位於最佳路徑上，則套用綠色背景
+            if st.session_state.policy == 'optimal' and pos in st.session_state.optimal_path:
+                bg_color = "#6cbf6c" # 這裡的色碼可以調整為你喜歡的綠色
+                
+            # 使用 Markdown 渲染格子
+            cols[c].markdown(
+                f'<div style="background-color: {bg_color}; color: {text_color}; '
+                f'padding: 10px 0; text-align: center; border-radius: 5px; border: 1px solid #ccc; '
+                f'font-weight: bold; font-size: 14px; min-height: 85px; '
+                f'display: flex; flex-direction: column; justify-content: center;">{cell_text}</div>', 
+                unsafe_allow_html=True
+            )
+            
+        # --- 尚未執行演算法 (設定模式：使用互動式按鈕) ---
+        else:
+            cell_text = "⬜"
+            if pos == st.session_state.start:
+                cell_text = "🟢"
+            elif pos == st.session_state.end:
+                cell_text = "🔴"
+            elif pos in st.session_state.obstacles:
+                cell_text = "⬛"
+                
+            if cols[c].button(cell_text, key=f"btn_{r}_{c}", use_container_width=True):
+                handle_click(r, c)
+                st.rerun()
 
 # 顯示當前資訊
 if st.session_state.policy:
