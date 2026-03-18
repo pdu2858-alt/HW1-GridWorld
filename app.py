@@ -142,12 +142,44 @@ def value_iteration(n):
 # --- UI 介面 ---
 init_state()
 
+# 注入 CSS 美化網格
+st.markdown("""
+    <style>
+    /* 讓按鈕垂直並排時更緊湊 */
+    div[data-testid="column"] {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    /* 自定義按鈕樣式 */
+    .stButton > button {
+        width: 100% !important;
+        height: 60px !important;
+        border-radius: 4px !important;
+        padding: 0 !important;
+        font-size: 14px !important;
+        line-height: 1.2 !important;
+        border: 1px solid #e0e0e0 !important;
+        background-color: #ffffff;
+        transition: all 0.2s ease;
+    }
+    .stButton > button:hover {
+        border-color: #4CAF50 !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+    }
+    /* 讓數值與箭頭置中 */
+    .stButton > button p {
+        margin: 0 !important;
+        font-weight: bold !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 st.title("網格地圖 RL 導航器 (Gridworld)")
 
 # 側邊欄設定
 with st.sidebar:
     st.header("環境設定")
-    new_n = st.slider("選擇網格維度 (n)", 5, 9, st.session_state.n)
+    new_n = st.slider("選擇網格維度 (n)", 5, 10, st.session_state.n)
     if new_n != st.session_state.n:
         st.session_state.n = new_n
         reset_env()
