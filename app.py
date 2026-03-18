@@ -4,62 +4,43 @@ import numpy as np
 # --- 參數與環境設定 ---
 ACTIONS = [(np.array([-1, 0]), '↑'), (np.array([1, 0]), '↓'), 
            (np.array([0, -1]), '←'), (np.array([0, 1]), '→')]
-GAMMA = 0.9  # 折扣因子
-REWARD_GOAL = 100
-REWARD_STEP = -1
-REWARD_OBSTACLE = -10
+GAMMA = 0.9
+REWARD_GOAL = 10.0
+REWARD_STEP = -0.1
+REWARD_OBSTACLE = -1.0
 
 def init_state():
-    """初始化 Session State"""
+    """根據提示詞初始化設定"""
     if 'n' not in st.session_state:
-        st.session_state.n = 5
+        st.session_state.n = 7
     if 'start' not in st.session_state:
-        st.session_state.start = None
+        st.session_state.start = (0, 0)
     if 'end' not in st.session_state:
-        st.session_state.end = None
+        st.session_state.end = (6, 6)
     if 'obstacles' not in st.session_state:
-        st.session_state.obstacles = []
+        # 預設一些牆壁，使用者仍可透過介面調整
+        st.session_state.obstacles = [(1,1), (1,2), (2,1), (4,4), (4,5), (5,4)]
     if 'phase' not in st.session_state:
-        st.session_state.phase = 'set_start'
+        st.session_state.phase = 'ready'
     if 'policy' not in st.session_state:
-        st.session_state.policy = None # 'random' 或 'optimal'
+        st.session_state.policy = None
     if 'V' not in st.session_state:
-        st.session_state.V = None
+        st.session_state.V = np.zeros((7, 7))
     if 'action_grid' not in st.session_state:
-        st.session_state.action_grid = None
+        st.session_state.action_grid = np.zeros((7, 7), dtype=int)
     if 'path' not in st.session_state:
         st.session_state.path = []
 
 def reset_env():
-    """重置環境"""
-    st.session_state.start = None
-    st.session_state.end = None
-    st.session_state.obstacles = []
-    st.session_state.phase = 'set_start'
+    st.session_state.start = (0, 0)
+    st.session_state.end = (6, 6)
+    st.session_state.obstacles = [(1,1), (1,2), (2,1), (4,4), (4,5), (5,4)]
+    st.session_state.phase = 'ready'
     st.session_state.policy = None
-    st.session_state.V = None
-    st.session_state.action_grid = None
+    st.session_state.V = np.zeros((st.session_state.n, st.session_state.n))
     st.session_state.path = []
 
-def handle_click(r, c):
-    """點擊網格邏輯"""
-    pos = (r, c)
-    if st.session_state.phase == 'set_start':
-        st.session_state.start = pos
-        st.session_state.phase = 'set_end'
-    elif st.session_state.phase == 'set_end':
-        if pos != st.session_state.start:
-            st.session_state.end = pos
-            st.session_state.phase = 'set_obstacles'
-    elif st.session_state.phase == 'set_obstacles':
-        if pos != st.session_state.start and pos != st.session_state.end:
-            if pos not in st.session_state.obstacles:
-                st.session_state.obstacles.append(pos)
-                if len(st.session_state.obstacles) >= st.session_state.n - 2:
-                    st.session_state.phase = 'ready'
-
 def get_next_state(s, a_idx, n):
-    """取得下一個狀態與回報"""
     move = ACTIONS[a_idx][0]
     next_s = (s[0] + move[0], s[1] + move[1])
     if (next_s[0] < 0 or next_s[0] >= n or 
@@ -71,10 +52,9 @@ def get_next_state(s, a_idx, n):
     return next_s, REWARD_STEP
 
 def calculate_path():
-    """根據當前政策從起點追蹤路徑"""
     if st.session_state.action_grid is None or st.session_state.start is None:
         return []
-    path = []
+    path = [st.session_state.start]
     curr = st.session_state.start
     visited = {curr}
     for _ in range(st.session_state.n * st.session_state.n):
@@ -87,44 +67,12 @@ def calculate_path():
         path.append(next_s)
         visited.add(next_s)
         curr = next_s
-        if curr == st.session_state.end:
-            break
     return path
 
-def policy_evaluation(n):
-    """HW1-2: 隨機策略評估"""
-    V = np.zeros((n, n))
-    # 隨機行動顯示
-    action_grid = np.random.randint(0, 4, size=(n, n))
-    theta = 1e-4
-    while True:
-        delta = 0
-        new_V = np.copy(V)
-        for r in range(n):
-            for c in range(n):
-                s = (r, c)
-                if s == st.session_state.end or s in st.session_state.obstacles:
-                    continue
-                v_s = 0
-                for a_idx in range(4):
-                    next_s, reward = get_next_state(s, a_idx, n)
-                    v_s += 0.25 * (reward + GAMMA * V[next_s[0], next_s[1]])
-                new_V[r, c] = v_s
-                delta = max(delta, abs(v_s - V[r, c]))
-        V = new_V
-        if delta < theta:
-            break
-    st.session_state.V = V
-    st.session_state.action_grid = action_grid
-    st.session_state.policy = 'random'
-    st.session_state.path = calculate_path()
-
 def value_iteration(n):
-    """HW1-3: 價值迭代演算法"""
     V = np.zeros((n, n))
     action_grid = np.zeros((n, n), dtype=int)
     theta = 1e-4
-    # 1. 價值迭代計算 V*
     while True:
         delta = 0
         new_V = np.copy(V)
@@ -142,18 +90,20 @@ def value_iteration(n):
         V = new_V
         if delta < theta:
             break
-    # 2. 推導最佳政策 (Greedy Policy)
     for r in range(n):
         for c in range(n):
             s = (r, c)
-            if s == st.session_state.end or s in st.session_state.obstacles:
+            if s == st.session_state.end:
+                V[r, c] = REWARD_GOAL
+                continue
+            if s in st.session_state.obstacles:
                 continue
             action_values = []
             for a_idx in range(4):
                 next_s, reward = get_next_state(s, a_idx, n)
                 action_values.append(reward + GAMMA * V[next_s[0], next_s[1]])
             action_grid[r, c] = np.argmax(action_values)
-    
+            
     st.session_state.V = V
     st.session_state.action_grid = action_grid
     st.session_state.policy = 'optimal'
@@ -162,114 +112,117 @@ def value_iteration(n):
 # --- UI 呈現 ---
 init_state()
 
-# CSS 美化：移除間隙、定義狀態配色
 st.markdown("""
     <style>
-    [data-testid="column"] { padding: 0px !important; margin: 0px !important; }
-    [data-testid="stHorizontalBlock"] { gap: 0px !important; }
+    /* 高解析度數據網格風格 */
+    .grid-container {
+        border: 3px solid black;
+        display: inline-block;
+        background-color: #f0f0f0;
+    }
+    [data-testid="column"] {
+        padding: 0px !important;
+        margin: 0px !important;
+    }
+    [data-testid="stHorizontalBlock"] {
+        gap: 0px !important;
+        border-bottom: 0.5px solid #ccc;
+    }
+    
+    /* 格子基本樣式 */
     .stButton > button {
         width: 100% !important;
-        height: 70px !important;
+        height: 85px !important;
         border-radius: 0px !important;
-        border: 0.1px solid #444 !important;
-        background-color: #262626 !important;
-        color: white !important;
-        font-size: 14px !important;
-        line-height: 1.2 !important;
+        border: 0.5px solid #ccc !important;
+        background-color: white !important;
+        color: black !important;
+        font-size: 13px !important;
+        font-family: 'Arial', sans-serif !important;
+        line-height: 1.1 !important;
         margin: 0 !important;
-        display: block !important;
+        transition: none !important;
     }
-    /* 起點 */
-    .start-node > div > button { background-color: #2E7D32 !important; color: white !important; font-weight: bold !important; }
-    /* 終點 */
-    .end-node > div > button { background-color: #C62828 !important; color: white !important; font-weight: bold !important; }
-    /* 障礙物 */
-    .obstacle-node > div > button { background-color: #000000 !important; color: #555 !important; }
-    /* 最佳路徑高亮 */
-    .path-node > div > button { background-color: #FF8F00 !important; color: black !important; font-weight: bold !important; border: 1px solid gold !important; }
+    
+    /* 牆壁：黑色標記 WALL */
+    .wall-node > div > button {
+        background-color: #000000 !important;
+        color: #ffffff !important;
+        font-weight: bold !important;
+    }
+    
+    /* 最優路徑：鮮綠色高亮 (含 START, END) */
+    .path-node > div > button {
+        background-color: #00FF00 !important;
+        color: black !important;
+        font-weight: bold !important;
+    }
     
     .stButton > button p { margin: 0 !important; }
+    .stButton > button:hover { background-color: #f9f9f9 !important; }
     </style>
 """, unsafe_allow_html=True)
 
-st.title("網格地圖 RL 導航器 (HW1)")
+st.title("高解析度數據網格迷宮 - 價值迭代結果")
 
 with st.sidebar:
-    st.header("環境設定")
-    new_n = st.slider("選擇網格維度 (n)", 5, 10, st.session_state.n)
-    if new_n != st.session_state.n:
-        st.session_state.n = new_n
-        reset_env()
-        st.rerun()
-    st.button("🔄 重置地圖", on_click=reset_env)
-    
-    st.header("演算法操作")
-    if st.session_state.phase == 'ready':
-        if st.button("🎲 HW1-2: 隨機策略評估"):
-            policy_evaluation(st.session_state.n)
-        if st.button("🧠 HW1-3: 價值迭代 (最佳政策)"):
-            value_iteration(st.session_state.n)
-    else:
-        st.warning("請先完成地圖設定")
-
-# 狀態提示
-phases_msg = {
-    'set_start': "🟢 請點擊設定「起點」",
-    'set_end': "🔴 請點擊設定「終點」",
-    'set_obstacles': f"⬛ 請設定「障礙物」 (剩餘 {st.session_state.n - 2 - len(st.session_state.obstacles)} 個)",
-    'ready': "✅ 地圖就緒，請執行演算法"
-}
-st.subheader(phases_msg[st.session_state.phase])
+    st.header("控制面板")
+    if st.button("🧠 執行價值迭代 (Value Iteration)"):
+        value_iteration(st.session_state.n)
+    st.button("🔄 重置環境", on_click=reset_env)
+    st.write("---")
+    st.info("起點 (0,0), 終點 (6,6)\n綠色路徑代表最優導航。")
 
 # 繪製網格
+st.markdown('<div class="grid-container">', unsafe_allow_html=True)
 for r in range(st.session_state.n):
     cols = st.columns(st.session_state.n)
     for c in range(st.session_state.n):
         pos = (r, c)
         cell_text = ""
         node_class = ""
-        is_disabled = False
         
-        # 決定顯示內容與樣式
-        if pos == st.session_state.start:
-            node_class = "start-node"
-            cell_text = "START"
-            if st.session_state.policy:
-                action_sym = ACTIONS[st.session_state.action_grid[r, c]][1]
-                cell_text = f"START\n{action_sym}"
-        elif pos == st.session_state.end:
-            node_class = "end-node"
-            cell_text = "GOAL"
-        elif pos in st.session_state.obstacles:
-            node_class = "obstacle-node"
-            cell_text = "⬛"
+        is_path = pos in st.session_state.path
+        is_start = pos == st.session_state.start
+        is_end = pos == st.session_state.end
+        is_wall = pos in st.session_state.obstacles
+        
+        # 樣式決定
+        if is_path or is_start or is_end:
+            node_class = "path-node"
+        elif is_wall:
+            node_class = "wall-node"
+        
+        # 內容決定
+        if is_wall:
+            cell_text = "WALL\n-∞"
+        elif is_end:
+            # 終點包含最佳政策箭頭 (根據 V 計算)
+            a_idx = st.session_state.action_grid[r, c] if st.session_state.policy else 1 # 預設下
+            action_sym = ACTIONS[a_idx][1]
+            v_val = st.session_state.V[r, c]
+            cell_text = f"END\nV={v_val:.2f}\n{action_sym}"
+        elif is_start:
+            a_idx = st.session_state.action_grid[r, c] if st.session_state.policy else 3 # 預設右
+            action_sym = ACTIONS[a_idx][1]
+            v_val = st.session_state.V[r, c]
+            cell_text = f"START\nV={v_val:.2f}\n{action_sym}"
         else:
             if st.session_state.policy:
-                # 顯示價值函數 V(s) 與 行動箭頭
                 action_sym = ACTIONS[st.session_state.action_grid[r, c]][1]
                 v_val = st.session_state.V[r, c]
-                cell_text = f"{action_sym}\n{v_val:.1f}"
-                is_disabled = True
-                if pos in st.session_state.path:
-                    node_class = "path-node"
+                cell_text = f"V={v_val:.2f}\n{action_sym}"
             else:
                 cell_text = ""
-        
-        # 渲染按鈕
+
         with cols[c]:
             if node_class:
                 st.markdown(f'<div class="{node_class}">', unsafe_allow_html=True)
-                st.button(cell_text, key=f"btn_{r}_{c}", disabled=is_disabled, use_container_width=True)
+                st.button(cell_text, key=f"btn_{r}_{c}", use_container_width=True)
                 st.markdown('</div>', unsafe_allow_html=True)
             else:
-                if st.button(cell_text, key=f"btn_{r}_{c}", disabled=is_disabled, use_container_width=True):
-                    handle_click(r, c)
-                    st.rerun()
+                st.button(cell_text, key=f"btn_{r}_{c}", use_container_width=True)
+st.markdown('</div>', unsafe_allow_html=True)
 
-# 顯示數值矩陣
 if st.session_state.policy:
-    st.divider()
-    type_str = "隨機政策 (Random)" if st.session_state.policy == 'random' else "最佳政策 (Optimal)"
-    st.markdown(f"**當前顯示模式：** {type_str}")
-    st.markdown(f"**$V(s)$ 狀態價值矩陣：**")
-    st.dataframe(st.session_state.V)
+    st.success("最佳政策已推導。路徑由鮮綠色標記，箭頭指向最大化回報的方向。")
