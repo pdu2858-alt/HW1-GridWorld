@@ -112,6 +112,7 @@ def value_iteration(n):
     action_grid = np.zeros((n, n), dtype=int)
     theta = 1e-4
     
+    # 價值迭代直到收斂
     while True:
         delta = 0
         new_V = np.copy(V)
@@ -128,12 +129,24 @@ def value_iteration(n):
                 
                 best_value = max(action_values)
                 new_V[r, c] = best_value
-                action_grid[r, c] = np.argmax(action_values)
                 delta = max(delta, abs(best_value - V[r, c]))
-                
         V = new_V
         if delta < theta:
             break
+    
+    # 根據最終 V(s) 推導最佳政策 (Greedy Policy)
+    for r in range(n):
+        for c in range(n):
+            s = (r, c)
+            if s == st.session_state.end or s in st.session_state.obstacles:
+                continue
+            
+            action_values = []
+            for a_idx in range(4):
+                next_s, reward = get_next_state(s, a_idx, n)
+                action_values.append(reward + GAMMA * V[next_s[0], next_s[1]])
+            
+            action_grid[r, c] = np.argmax(action_values)
             
     st.session_state.V = V
     st.session_state.action_grid = action_grid
@@ -142,16 +155,17 @@ def value_iteration(n):
 # --- UI 介面 ---
 init_state()
 
-# 注入 CSS 美化網格 (深色科技感)
-st.markdown("""
+# 定義配色：最佳政策使用亮綠色 (#00FF00)，隨機政策使用原本的青色 (#00ffcc)
+active_color = "#00FF00" if st.session_state.policy == 'optimal' else "#00ffcc"
+
+# 注入 CSS 美化網格
+st.markdown(f"""
     <style>
-    /* 讓按鈕垂直並排時更緊湊 */
-    div[data-testid="column"] {
+    div[data-testid="column"] {{
         padding: 1px !important;
         margin: 0 !important;
-    }
-    /* 自定義按鈕樣式 - 深色科技感 */
-    .stButton > button {
+    }}
+    .stButton > button {{
         width: 100% !important;
         height: 65px !important;
         border-radius: 2px !important;
@@ -160,27 +174,25 @@ st.markdown("""
         line-height: 1.2 !important;
         border: 1px solid #3e3e3e !important;
         background-color: #1e1e1e !important;
-        color: #00ffcc !important; /* 科技感青綠色 */
+        color: {{active_color}} !important; 
         transition: all 0.3s ease;
-    }
-    .stButton > button:hover {
-        border-color: #00ffcc !important;
+    }}
+    .stButton > button:hover {{
+        border-color: {{active_color}} !important;
         background-color: #2d2d2d !important;
-        box-shadow: 0 0 10px rgba(0, 255, 204, 0.3) !important;
-    }
-    /* 針對已點擊/狀態顯示的優化 */
-    .stButton > button:disabled {
+        box-shadow: 0 0 10px {{active_color}}4d !important;
+    }}
+    .stButton > button:disabled {{
         background-color: #121212 !important;
-        color: #00ffcc !important;
+        color: {{active_color}} !important;
         opacity: 1 !important;
-        border: 1px solid #00ffcc !important;
-    }
-    /* 讓 Emoji 放大顯示 */
-    .stButton > button p {
+        border: 1px solid {{active_color}} !important;
+    }}
+    .stButton > button p {{
         margin: 0 !important;
         font-weight: bold !important;
         font-family: 'Courier New', Courier, monospace !important;
-    }
+    }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -215,31 +227,34 @@ phases_zhtw = {
 }
 st.subheader(phases_zhtw[st.session_state.phase])
 
-# 繪製網格 (使用 Streamlit Columns)
+# 繪製網格
 for r in range(st.session_state.n):
     cols = st.columns(st.session_state.n)
     for c in range(st.session_state.n):
         pos = (r, c)
         
-        # 決定按鈕顯示的文字與狀態
         cell_text = "⬜"
         is_disabled = False
         
         if pos == st.session_state.start:
-            cell_text = "🟢"
+            # 起點在演算法執行後也顯示最佳行動
+            if st.session_state.policy and st.session_state.V is not None:
+                action_sym = ACTIONS[st.session_state.action_grid[r, c]][1]
+                cell_text = f"🟢\n{{action_sym}}"
+            else:
+                cell_text = "🟢"
         elif pos == st.session_state.end:
             cell_text = "🔴"
         elif pos in st.session_state.obstacles:
             cell_text = "⬛"
         else:
-            # 如果有執行演算法，顯示策略方向與 Value
+            # 如果有執行演算法，顯示策略方向與 Value V(s)
             if st.session_state.policy and st.session_state.V is not None:
                 action_sym = ACTIONS[st.session_state.action_grid[r, c]][1]
                 val = st.session_state.V[r, c]
-                cell_text = f"{action_sym}\n{val:.1f}"
-                is_disabled = True # 演算法執行後鎖定網格
+                cell_text = f"{{action_sym}}\n{{val:.1f}}"
+                is_disabled = True 
                 
-        # 建立按鈕
         if cols[c].button(cell_text, key=f"btn_{r}_{c}", disabled=is_disabled, use_container_width=True):
             handle_click(r, c)
             st.rerun()
@@ -247,6 +262,7 @@ for r in range(st.session_state.n):
 # 顯示當前資訊
 if st.session_state.policy:
     st.divider()
-    st.markdown(f"**當前顯示狀態：** {'隨機策略 (Random Policy)' if st.session_state.policy == 'random' else '最佳策略 (Optimal Policy)'}")
+    status_label = "隨機策略 (Random Policy)" if st.session_state.policy == 'random' else "最佳策略 (Optimal Policy)"
+    st.markdown(f"**當前顯示狀態：** <span style='color:{{active_color}}; font-weight:bold;'>{{status_label}}</span>", unsafe_allow_html=True)
     st.markdown(f"**$V(s)$ 狀態價值矩陣：**")
     st.dataframe(st.session_state.V)
