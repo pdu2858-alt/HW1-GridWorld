@@ -142,34 +142,44 @@ def value_iteration(n):
 # --- UI 介面 ---
 init_state()
 
-# 注入 CSS 美化網格
+# 注入 CSS 美化網格 (深色科技感)
 st.markdown("""
     <style>
     /* 讓按鈕垂直並排時更緊湊 */
     div[data-testid="column"] {
-        padding: 0 !important;
+        padding: 1px !important;
         margin: 0 !important;
     }
-    /* 自定義按鈕樣式 */
+    /* 自定義按鈕樣式 - 深色科技感 */
     .stButton > button {
         width: 100% !important;
-        height: 60px !important;
-        border-radius: 4px !important;
+        height: 65px !important;
+        border-radius: 2px !important;
         padding: 0 !important;
-        font-size: 14px !important;
+        font-size: 15px !important;
         line-height: 1.2 !important;
-        border: 1px solid #e0e0e0 !important;
-        background-color: #ffffff;
-        transition: all 0.2s ease;
+        border: 1px solid #3e3e3e !important;
+        background-color: #1e1e1e !important;
+        color: #00ffcc !important; /* 科技感青綠色 */
+        transition: all 0.3s ease;
     }
     .stButton > button:hover {
-        border-color: #4CAF50 !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+        border-color: #00ffcc !important;
+        background-color: #2d2d2d !important;
+        box-shadow: 0 0 10px rgba(0, 255, 204, 0.3) !important;
     }
-    /* 讓數值與箭頭置中 */
+    /* 針對已點擊/狀態顯示的優化 */
+    .stButton > button:disabled {
+        background-color: #121212 !important;
+        color: #00ffcc !important;
+        opacity: 1 !important;
+        border: 1px solid #00ffcc !important;
+    }
+    /* 讓 Emoji 放大顯示 */
     .stButton > button p {
         margin: 0 !important;
         font-weight: bold !important;
+        font-family: 'Courier New', Courier, monospace !important;
     }
     </style>
 """, unsafe_allow_html=True)
