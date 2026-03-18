@@ -240,7 +240,7 @@ for r in range(st.session_state.n):
             # 起點在演算法執行後也顯示最佳行動
             if st.session_state.policy and st.session_state.V is not None:
                 action_sym = ACTIONS[st.session_state.action_grid[r, c]][1]
-                cell_text = f"🟢\n{{action_sym}}"
+                cell_text = f"🟢\n{action_sym}"
             else:
                 cell_text = "🟢"
         elif pos == st.session_state.end:
@@ -252,7 +252,7 @@ for r in range(st.session_state.n):
             if st.session_state.policy and st.session_state.V is not None:
                 action_sym = ACTIONS[st.session_state.action_grid[r, c]][1]
                 val = st.session_state.V[r, c]
-                cell_text = f"{{action_sym}}\n{{val:.1f}}"
+                cell_text = f"{action_sym}\n{val:.1f}"
                 is_disabled = True 
                 
         if cols[c].button(cell_text, key=f"btn_{r}_{c}", disabled=is_disabled, use_container_width=True):
@@ -263,6 +263,6 @@ for r in range(st.session_state.n):
 if st.session_state.policy:
     st.divider()
     status_label = "隨機策略 (Random Policy)" if st.session_state.policy == 'random' else "最佳策略 (Optimal Policy)"
-    st.markdown(f"**當前顯示狀態：** <span style='color:{{active_color}}; font-weight:bold;'>{{status_label}}</span>", unsafe_allow_html=True)
+    st.markdown(f"**當前顯示狀態：** <span style='color:{active_color}; font-weight:bold;'>{status_label}</span>", unsafe_allow_html=True)
     st.markdown(f"**$V(s)$ 狀態價值矩陣：**")
     st.dataframe(st.session_state.V)
